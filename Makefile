@@ -65,10 +65,10 @@ fallthrough: submodules
 # ====================================================================================
 # Setup XPKG
 
-XPKG_REG_ORGS ?= xpkg.upbound.io/crossplane-contrib index.docker.io/crossplanecontrib
+XPKG_REG_ORGS ?= xpkg.dev-deba7a0e.u6d.dev/jastang
 # NOTE(hasheddan): skip promoting on xpkg.upbound.io as channel tags are
 # inferred.
-XPKG_REG_ORGS_NO_PROMOTE ?= xpkg.upbound.io/crossplane-contrib
+XPKG_REG_ORGS_NO_PROMOTE ?= xpkg.dev-deba7a0e.u6d.dev/jastang
 XPKGS = provider-kubernetes
 -include build/makelib/xpkg.mk
 
