@@ -65,10 +65,10 @@ fallthrough: submodules
 # ====================================================================================
 # Setup XPKG
 
-XPKG_REG_ORGS ?= xpkg.dev-deba7a0e.u6d.dev/jastang
+XPKG_REG_ORGS ?= xpkg.dev-deba7a0e.u6d.dev/upbound
 # NOTE(hasheddan): skip promoting on xpkg.upbound.io as channel tags are
 # inferred.
-XPKG_REG_ORGS_NO_PROMOTE ?= xpkg.dev-deba7a0e.u6d.dev/jastang
+XPKG_REG_ORGS_NO_PROMOTE ?= xpkg.dev-deba7a0e.u6d.dev/upbound
 XPKGS = provider-kubernetes
 -include build/makelib/xpkg.mk
 
