@@ -18,6 +18,7 @@ env:
   # a step 'if env.AWS_USR' != ""', so we copy these to succinctly test whether
   # credentials have been provided before trying to run steps that need them.
   XPKG_ACCESS_ID: ${{ secrets.XPKG_ACCESS_ID }}
+  SBOM_FILE: /tmp/sbom-action-${{ github.run_id }}/${{ github.repository }}-publish-artifacts.spdx.json
 
 jobs:
   detect-noop:
@@ -253,6 +254,14 @@ jobs:
           version: ${{ env.DOCKER_BUILDX_VERSION }}
           install: true
 
+      - name: Setup Cosign
+        uses: sigstore/cosign-installer@v3.6.0
+        with:
+          cosign-release: 'v2.4.0'
+
+      - name: Validate Cosign installation
+        run: cosign version
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -294,11 +303,18 @@ jobs:
           # builds by default. Specifying --load does so.
           BUILD_ARGS: "--load"
 
+      - name: Open a file for the SBOM
+        run: mkdir -p /tmp/sbom-action-${{ github.run_id }}/${{ github.repository_owner }} && touch ${{ env.SBOM_FILE }}
+
       - name: Generate SBOM with Syft
         uses: anchore/sbom-action@v0
         with:
           # This will scan recursively, and behind the scenes appends `dir:`.
           path: ./_output/
+          output-file: ${{ env.SBOM_FILE }}
+
+      - name: Upload SBOM to Upbound
+        run: cosign attach sbom --sbom ${{ env.SBOM_FILE }} xpkg.dev-deba7a0e.u6d.dev/upbound/${{ github.repository }}:v0.13.0
 
       - name: Publish Artifacts to GitHub
         uses: actions/upload-artifact@v2
