@@ -345,6 +345,11 @@ jobs:
         if: steps.get_tag.outputs.tag_name != ''
         run: cosign attest --yes --predicate ${{ env.SBOM_FILE }} --type spdxjson xpkg.dev-deba7a0e.u6d.dev/upbound/provider-kubernetes:${{ steps.get_tag.outputs.tag_name }}
 
+      - name: Upload the SBOM to the registry
+        # TODO: use image digest, not tag.
+        if: steps.get_tag.outputs.tag_name != ''
+        run: cosign attach sbom --sbom ${{ env.SBOM_FILE }} xpkg.dev-deba7a0e.u6d.dev/upbound/provider-kubernetes:${{ steps.get_tag.outputs.tag_name }}
+
       - name: Sign the image with cosign
         # TODO: use image digest, not tag.
         if: steps.get_tag.outputs.tag_name != ''
