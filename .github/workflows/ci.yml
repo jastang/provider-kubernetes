@@ -245,6 +245,8 @@ jobs:
     permissions:
       # for keyless signing using GitHub OIDC token
       id-token: write
+      # for uploading SARIF reports to GitHub
+      security-events: write
 
     steps:
       - name: Setup QEMU
