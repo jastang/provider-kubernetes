@@ -316,6 +316,13 @@ jobs:
           # This will scan recursively, and behind the scenes appends `dir:`.
           path: ./_output/
           output-file: ${{ env.SBOM_FILE }}
+          format: spdx-json
+
+      - name: Scan SBOM with Grype and generate CVE report
+        uses: anchore/scan-action@v3
+        with:
+          sbom: ${{ env.SBOM_FILE }}
+          output-format: sarif
 
       - name: Login to Upbound
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
