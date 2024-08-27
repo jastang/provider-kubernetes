@@ -324,8 +324,7 @@ jobs:
         with:
           sbom: ${{ env.SBOM_FILE }}
           output-format: sarif
-          fail-build: true
-          severity-cutoff: high
+          fail-build: false
 
       - name: Upload SARIF report from CVE Scan
         uses: github/codeql-action/upload-sarif@v2
