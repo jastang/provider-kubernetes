@@ -329,9 +329,11 @@ jobs:
           fail-build: false
 
       - name: Upload SARIF report from CVE Scan
-        uses: github/codeql-action/upload-sarif@v2
+        uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3
         with:
-          sarif_file: ${{ steps.cve_scan.outputs.sarif }}
+          name: grype-scan-results.sarif
+          path: ${{ steps.cve_scan.outputs.sarif }}
+          retention-days: 3
 
       - name: Login to Upbound
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
