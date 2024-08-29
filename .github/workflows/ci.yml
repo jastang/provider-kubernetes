@@ -260,14 +260,6 @@ jobs:
           version: ${{ env.DOCKER_BUILDX_VERSION }}
           install: true
 
-      - name: Setup Cosign
-        uses: sigstore/cosign-installer@v3.6.0
-        with:
-          cosign-release: 'v2.4.0'
-
-      - name: Validate Cosign installation
-        run: cosign version
-
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -309,32 +301,6 @@ jobs:
           # builds by default. Specifying --load does so.
           BUILD_ARGS: "--load"
 
-      - name: Open a file for the SBOM
-        run: mkdir -p /tmp/sbom-action-${{ github.run_id }}/${{ github.repository_owner }} && touch ${{ env.SBOM_FILE }}
-
-      - name: Generate SBOM with Syft
-        uses: anchore/sbom-action@v0
-        with:
-          # This will scan recursively, and behind the scenes appends `dir:`.
-          path: ./_output/
-          output-file: ${{ env.SBOM_FILE }}
-          format: spdx-json
-
-      - name: Scan SBOM with Grype and generate CVE report
-        uses: anchore/scan-action@v3
-        id: cve_scan
-        with:
-          sbom: ${{ env.SBOM_FILE }}
-          output-format: sarif
-          fail-build: false
-
-      - name: Upload SARIF report from CVE Scan
-        uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3
-        with:
-          name: grype-scan-results.sarif
-          path: ${{ steps.cve_scan.outputs.sarif }}
-          retention-days: 3
-
       - name: Login to Upbound
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
         if: env.XPKG_ACCESS_ID != ''
@@ -346,39 +312,12 @@ jobs:
       - name: Publish Artifacts to S3 and Docker Hub
         run: make -j2 publish BRANCH_NAME=${GITHUB_REF##*/}
 
-      - name: Check for a release tag
-        id: get_tag
-        # Our build machinery doesn't currently support tags for the github ref.
-        run: |
-          TAG=$(git tag --points-at ${{ github.sha }} | head -n 1)
-          if [ -n "$TAG" ]; then
-            echo "Tag found on the same commit: $TAG"
-            echo "::set-output name=tag_name::${TAG}"
-          else
-            echo "No tag found on this commit."
-          fi
-
-      - name: Create an SBOM attestation with cosign
-        # TODO: use image digest, not tag.
-        # TODO: parametrize repository name and switch to xpkg.upbound.io
-        if: steps.get_tag.outputs.tag_name != ''
-        run: cosign attest --yes --predicate ${{ env.SBOM_FILE }} --type spdxjson xpkg.dev-deba7a0e.u6d.dev/upbound/provider-kubernetes:${{ steps.get_tag.outputs.tag_name }}
-
-      - name: Upload the SBOM to the registry
-        # TODO: use image digest, not tag.
-        # TODO: parametrize repository name and switch to xpkg.upbound.io
-        # TODO: cosign will deprecate sbom attach, but currently there is no straightforward way to upload one to the registry.
-        if: steps.get_tag.outputs.tag_name != ''
-        run: cosign attach sbom --sbom ${{ env.SBOM_FILE }} xpkg.dev-deba7a0e.u6d.dev/upbound/provider-kubernetes:${{ steps.get_tag.outputs.tag_name }}
-
-      - name: Sign the image with cosign
-        # TODO: use image digest, not tag.
-        if: steps.get_tag.outputs.tag_name != ''
-        run: cosign sign --yes xpkg.dev-deba7a0e.u6d.dev/upbound/provider-kubernetes:${{ steps.get_tag.outputs.tag_name }}
-
       - name: Publish Artifacts to GitHub
         uses: actions/upload-artifact@v2
         with:
           name: output
           path: _output/**
 
+  sign-and-attest:
+    needs: publish-artifacts
+    uses: ./.github/workflows/supplychain.yml

@@ -1,0 +1,135 @@
+name: Update Software Supply Chain
+
+on:
+  workflow_call: # this workflow takes no inputs from the build.
+
+env:
+  # Common versions
+  GO_VERSION: '1.21.7'
+  XPKG_ACCESS_ID: ${{ secrets.XPKG_ACCESS_ID }}
+  SBOM_FILE: /tmp/sbom-action-${{ github.run_id }}/${{ github.repository }}-publish-artifacts.spdx.json
+
+jobs:
+  sign-and-attest:
+    runs-on: ubuntu-20.04
+    permissions:
+      # for keyless signing using GitHub OIDC token
+      id-token: write  
+      # for uploading SARIF reports to GitHub, if and when we enable it.
+      security-events: write
+      # only required for workflows in private repositories
+      actions: read
+      contents: read
+    steps:
+      - name: Setup Cosign
+        uses: sigstore/cosign-installer@v3.6.0
+        with:
+          cosign-release: 'v2.4.0'
+
+      - name: Validate Cosign installation
+        run: cosign version
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Fetch History
+        run: git fetch --prune --unshallow
+
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Find the Go Build Cache
+        id: go
+        run: echo "::set-output name=cache::$(go env GOCACHE)"
+
+      - name: Cache the Go Build Cache
+        uses: actions/cache@v2
+        with:
+          path: ${{ steps.go.outputs.cache }}
+          key: ${{ runner.os }}-build-publish-artifacts-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-build-publish-artifacts-
+
+      - name: Cache Go Dependencies
+        uses: actions/cache@v2
+        with:
+          path: .work/pkg
+          key: ${{ runner.os }}-pkg-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-pkg-
+
+      - name: Vendor Dependencies
+        run: make vendor vendor.check
+
+      - name: Build Artifacts
+        run: make -j2 build.all
+        env:
+          # We're using docker buildx, which doesn't actually load the images it
+          # builds by default. Specifying --load does so.
+          BUILD_ARGS: "--load"
+
+      - name: Open a file for the SBOM
+        run: mkdir -p /tmp/sbom-action-${{ github.run_id }}/${{ github.repository_owner }} && touch ${{ env.SBOM_FILE }}
+
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          # This will scan recursively, and behind the scenes appends `dir:`.
+          path: .
+          output-file: ${{ env.SBOM_FILE }}
+          format: spdx-json
+          
+      - name: Scan SBOM with Grype and generate CVE report
+        uses: anchore/scan-action@v3
+        id: cve_scan
+        with:
+          sbom: ${{ env.SBOM_FILE }}
+          output-format: sarif
+          fail-build: false
+
+      - name: Upload SARIF report from CVE Scan
+        uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3
+        with:
+          name: grype-scan-results.sarif
+          path: ${{ steps.cve_scan.outputs.sarif }}
+          retention-days: 3
+
+      - name: Login to Upbound
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
+        if: env.XPKG_ACCESS_ID != ''
+        with:
+          registry: xpkg.dev-deba7a0e.u6d.dev
+          username: ${{ secrets.XPKG_ACCESS_ID }}
+          password: ${{ secrets.XPKG_TOKEN }}
+
+      - name: Check for a release tag
+        id: get_tag
+        # Our build machinery doesn't currently support tags for the github ref.
+        run: |
+          TAG=$(git tag --points-at ${{ github.sha }} | head -n 1)
+          if [ -n "$TAG" ]; then
+            echo "Tag found on the same commit: $TAG"
+            echo "::set-output name=tag_name::${TAG}"
+          else
+            echo "No tag found on this commit."
+          fi
+
+      - name: Create an SBOM attestation with cosign
+        # TODO: use image digest, not tag.
+        # TODO: parametrize repository name and switch to xpkg.upbound.io
+        if: steps.get_tag.outputs.tag_name != ''
+        run: cosign attest --yes --predicate ${{ env.SBOM_FILE }} --type spdxjson xpkg.dev-deba7a0e.u6d.dev/upbound/provider-kubernetes:${{ steps.get_tag.outputs.tag_name }}
+
+      - name: Upload the SBOM to the registry
+        # TODO: use image digest, not tag.
+        # TODO: parametrize repository name and switch to xpkg.upbound.io
+        # TODO: cosign will deprecate sbom attach, but currently there is no straightforward way to upload one to the registry.
+        if: steps.get_tag.outputs.tag_name != ''
+        run: cosign attach sbom --sbom ${{ env.SBOM_FILE }} xpkg.dev-deba7a0e.u6d.dev/upbound/provider-kubernetes:${{ steps.get_tag.outputs.tag_name }}
+
+      - name: Sign the image with cosign
+        # TODO: use image digest, not tag.
+        if: steps.get_tag.outputs.tag_name != ''
+        run: cosign sign --yes xpkg.dev-deba7a0e.u6d.dev/upbound/provider-kubernetes:${{ steps.get_tag.outputs.tag_name }}
