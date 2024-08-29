@@ -1,7 +1,7 @@
 name: Update Software Supply Chain
 
 on:
-  workflow_call:
+  workflow_call: # TODO: we may want an input for the git SHA to make sure we check out the same code.
     # we need to declare the robot token being passed through explicitly.
     secrets:
       XPKG_ACCESS_ID:
@@ -68,13 +68,6 @@ jobs:
 
       - name: Vendor Dependencies
         run: make vendor vendor.check
-
-      - name: Build Artifacts
-        run: make -j2 build.all
-        env:
-          # We're using docker buildx, which doesn't actually load the images it
-          # builds by default. Specifying --load does so.
-          BUILD_ARGS: "--load"
 
       - name: Open a file for the SBOM
         run: mkdir -p /tmp/sbom-action-${{ github.run_id }}/${{ github.repository_owner }} && touch ${{ env.SBOM_FILE }}
