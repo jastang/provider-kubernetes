@@ -1,7 +1,13 @@
 name: Update Software Supply Chain
 
 on:
-  workflow_call: # this workflow takes no inputs from the build.
+  workflow_call:
+    # we need to declare the robot token being passed through explicitly.
+    secrets:
+      XPKG_ACCESS_ID:
+        required: true
+      XPKG_TOKEN:
+        required: true
 
 env:
   # Common versions
