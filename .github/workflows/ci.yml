@@ -245,7 +245,7 @@ jobs:
     permissions:
       # for keyless signing using GitHub OIDC token
       id-token: write
-      # for uploading SARIF reports to GitHub
+      # for uploading SARIF reports to GitHub Code Scanning.
       security-events: write
 
     steps:
@@ -360,11 +360,14 @@ jobs:
 
       - name: Create an SBOM attestation with cosign
         # TODO: use image digest, not tag.
+        # TODO: parametrize repository name and switch to xpkg.upbound.io
         if: steps.get_tag.outputs.tag_name != ''
         run: cosign attest --yes --predicate ${{ env.SBOM_FILE }} --type spdxjson xpkg.dev-deba7a0e.u6d.dev/upbound/provider-kubernetes:${{ steps.get_tag.outputs.tag_name }}
 
       - name: Upload the SBOM to the registry
         # TODO: use image digest, not tag.
+        # TODO: parametrize repository name and switch to xpkg.upbound.io
+        # TODO: cosign will deprecate sbom attach, but currently there is no straightforward way to upload one to the registry.
         if: steps.get_tag.outputs.tag_name != ''
         run: cosign attach sbom --sbom ${{ env.SBOM_FILE }} xpkg.dev-deba7a0e.u6d.dev/upbound/provider-kubernetes:${{ steps.get_tag.outputs.tag_name }}
 
