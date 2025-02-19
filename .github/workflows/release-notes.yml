@@ -58,3 +58,9 @@ jobs:
           echo "" >> $FILE
           echo "## Changes Since $PREVIOUS_TAG" >> $FILE
           echo "$DIFF_LOG" >> $FILE
+
+      - name: Upload Release Notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release_notes.md
