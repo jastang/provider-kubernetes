@@ -25,7 +25,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          TAGS=($(gh api repos/${{ github.repository }}/releases --jq '.[0].tag_name, .[1].tag_name'))
+          TAGS=($(gh api repos/${{ inputs.repository }}/releases --jq '.[0].tag_name, .[1].tag_name'))
           CURRENT_TAG=${TAGS[0]}
           PREVIOUS_TAG=${TAGS[1]}
 
@@ -36,7 +36,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          DIFF_LOG=$(gh api repos/${{ github.repository }}/compare/$PREVIOUS_TAG...$CURRENT_TAG --jq '.commits | map("- " + .commit.message) | join("\n")')
+          DIFF_LOG=$(gh api repos/${{ inputs.repository }}/compare/$PREVIOUS_TAG...$CURRENT_TAG --jq '.commits | map("- " + .commit.message) | join("\n")')
 
           echo "DIFF_LOG<<EOF" >> $GITHUB_ENV
           echo "$DIFF_LOG" >> $GITHUB_ENV
@@ -46,7 +46,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          RELEASE_BODY=$(gh release view $LATEST_TAG --repo ${{ github.repository }} --json body -q .body)
+          RELEASE_BODY=$(gh release view $LATEST_TAG --repo ${{ inputs.repository }} --json body -q .body)
 
           echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
           echo "$RELEASE_BODY" >> $GITHUB_ENV
