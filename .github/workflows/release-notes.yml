@@ -2,9 +2,14 @@ name: Attach Release Notes
 
 on:
   workflow_dispatch:
+    inputs:
+      repository:
+        description: 'github repository identifier <org>/<repo>, e.g. crossplane-contrib/provider-upjet-aws'
+        required: true
+        type: string
 
 env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
 jobs:
   attach-release-notes:
@@ -18,7 +23,7 @@ jobs:
 
       - name: Get previous release tags
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           TAGS=($(gh api repos/${{ github.repository }}/releases --jq '.[0].tag_name, .[1].tag_name'))
           CURRENT_TAG=${TAGS[0]}
@@ -29,7 +34,7 @@ jobs:
 
       - name: Create diff log
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           DIFF_LOG=$(gh api repos/${{ github.repository }}/compare/$PREVIOUS_TAG...$CURRENT_TAG --jq '.commits | map("- " + .commit.message) | join("\n")')
 
@@ -39,7 +44,7 @@ jobs:
 
       - name: Fetch GitHub Release body
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           RELEASE_BODY=$(gh release view $LATEST_TAG --repo ${{ github.repository }} --json body -q .body)
 
