@@ -1,0 +1,56 @@
+name: Build FIPS Crossplane Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+        subpackages:
+            description: 'Space-separated list of packages to be built individually (e.g. config ec2)'
+            default: 'config'
+            required: false
+            type: string
+        fips_os:
+            description: 'Target OS (e.g. RHEL) to build for.'
+            required: true
+            type: choice
+            options:
+                - rhel
+                - amazonlinux
+jobs:
+    get-matrix:
+        runs-on: ubuntu-latest
+        outputs:
+            services: ${{ steps.set-matrix.outputs.services }}
+        steps:
+            - id: set-matrix
+              run: |
+                services=$(echo "${{ inputs.subpackages }}" | jq -R -c 'split(" ")')
+                echo "services=${services}" >> $GITHUB_OUTPUT
+    build-provider-binaries:
+        needs: get-matrix
+        strategy:
+            matrix:
+                arch: [amd64, arm64]
+                service: ${{ fromJSON(needs.get-matrix.outputs.services) }}
+                include:
+                    - runner: ubuntu-24.04
+                      arch: amd64
+                    - runner: ubuntu-24.04-arm
+                      arch: arm64
+        runs-on: ${{ matrix.runner }}
+        steps:
+            - id: build-binary
+              run: echo "Running FIPS_OS=${{ inputs.fips_os }} SERVICE=${{ matrix.service }} TARGET_OS=linux TARGET_ARCH=${{ matrix.arch }} make build.fips"
+            - id: upload-binary
+              run: echo "Uploading binary ${{ matrix.service }} to artifacts"
+    batch-process:
+        needs: build-provider-binaries
+        runs-on: ubuntu-24.04
+        steps:
+            - id: collect-binaries
+              run: echo "Downloading binaries ..."
+            - id: build-base-image
+              run: echo "docker buildx build --platform ..."
+            - id: build-xpkgs
+              run: |
+                STORE_PACKAGES="$(tr ' ' ',' <<< "${{ inputs.subpackages }}")"
+                echo "BUILD_ONLY=true STORE_PACKAGES=$STORE_PACKAGES ... make batch-process"
