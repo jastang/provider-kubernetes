@@ -1,5 +1,5 @@
-//go:build !uxp
-// +build !uxp
+//go:build !standard && !community
+// +build !standard,!community
 
 package bootcheck
 
